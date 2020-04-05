@@ -52,5 +52,6 @@ def rotate_directory(directory):
     :param directory: (string) path of the directory 
     :return: nothing
     '''
+    print('Received a call to rotate_directory() for ' + directory)
     for filename in listdir(directory):
         rotate_jpeg(directory + '/' + filename)
