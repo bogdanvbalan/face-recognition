@@ -6,14 +6,17 @@
 # This is used to load the dataset from folders containing pictures. 
 # The labels are created based on the names of the folders. 
 
-
+from os import getcwd
 from os import listdir
 from os.path import isdir
-from numpy import savez_compressed
 from numpy import asarray
+from numpy import savez_compressed
 from utils.face_extract import extract_face
 from utils.set_rotation import rotate_directory
 import imageio
+
+
+SAVE_FOLDER = getcwd() + '/data/datasets/raw/'
 
 def load_faces(directory):
         ''' Use extract_faces() in order to get the faces from a specific 
@@ -95,3 +98,30 @@ def load_dataset(directory, preprocessing=0):
           y.extend(labels)
 
         return asarray(X), asarray(y)
+
+def load_and_save_dataset(directory, preprocess_train=0, preprocess_test=0):
+        ''' Use load_dataset() in order to load and save the dataset
+              found in the directory received as arguments
+            Apply preprocessing according to the value received:
+            0 - no preprocessing
+            1 - extract faces
+            2 - set rotation and extract faces
+
+            The dataset is saved in /data/datasets/raw
+        Args:
+            directory (string): The path to the main directory
+
+        Raises: nothing
+
+        Returns: nothing
+
+        '''
+        print(' ============================')
+        print(SAVE_FOLDER)
+        print(' ============================')
+
+        x_train, y_train = load_dataset(directory + '/train/',preprocessing=preprocess_train)
+
+        x_test, y_test = load_dataset(directory + '/val/',preprocessing=preprocess_test)
+
+        savez_compressed(SAVE_FOLDER + 'custom_dataset.npz', x_train, y_train, x_test, y_test)
