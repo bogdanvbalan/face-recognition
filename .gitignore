@@ -15,6 +15,7 @@ output/
 *.sln.docstates
 *.sln
 *.pyproj
+*.npz
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

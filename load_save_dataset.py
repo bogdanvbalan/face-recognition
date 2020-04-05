@@ -1,10 +1,5 @@
-
 from numpy import savez_compressed
-from utils.face_extract import extract_face
-from utils.set_rotation import rotate_directory
 from utils.load_dataset import load_dataset
-
-
 
 x_train, y_train = load_dataset('pics/train/',preprocessing=1)
 print(x_train.shape)
