@@ -1,4 +1,4 @@
-from utils import face_extract, set_rotation
+from utils import face_extract, set_rotation, load_dataset
 import matplotlib.pyplot as plt
 from os import listdir
 

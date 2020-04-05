@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{ca9f3000-8054-4078-9026-700ca0f6d27f}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>Face_Recognition.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>CondaEnv|CondaEnv|visual_studio_env</InterpreterId>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Face_Recognition.py" />
+    <Compile Include="utils\face_extract.py" />
+    <Compile Include="utils\load_dataset.py" />
+    <Compile Include="utils\set_rotation.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="pics\BASI6106.jpg" />
+    <Content Include="pics\HXYK4010.jpg" />
+    <Content Include="pics\IMAG0603.jpg" />
+    <Content Include="pics\IMG_0128.JPG" />
+    <Content Include="pics\IMG_0133.JPG" />
+    <Content Include="pics\IMG_0223.JPG" />
+    <Content Include="pics\IMG_0233.JPG" />
+    <Content Include="pics\IMG_0293.JPG" />
+    <Content Include="pics\IMG_0581.JPG" />
+    <Content Include="pics\IMG_0678.JPG" />
+    <Content Include="pics\IMG_1406.JPG" />
+    <Content Include="pics\IMG_1449.JPG" />
+    <Content Include="pics\IMG_1522.JPG" />
+    <Content Include="pics\IMG_1596.JPG" />
+    <Content Include="pics\IMG_1673.JPG" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="pics" />
+    <Folder Include="utils" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|visual_studio_env" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
