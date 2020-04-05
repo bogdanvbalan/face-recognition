@@ -22,6 +22,9 @@
     <Compile Include="Face_Recognition.py" />
     <Compile Include="utils\face_extract.py" />
     <Compile Include="utils\load_dataset.py" />
+    <Compile Include="utils\__init__.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="utils\set_rotation.py" />
   </ItemGroup>
   <ItemGroup>

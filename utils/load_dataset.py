@@ -10,6 +10,6 @@
 from os import listdir
 from os.path import isdir
 from numpy import savez_compressed
-from face_extract.py import extract_face
+from utils.face_extract import extract_face
 import imageio
 
