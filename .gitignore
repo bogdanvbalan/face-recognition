@@ -13,6 +13,8 @@ output/
 *.user
 *.userosscache
 *.sln.docstates
+*.sln
+*.pyproj
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
