@@ -6,6 +6,7 @@
 # Directories 
 pics/
 output/
+test/
 
 # User-specific files
 *.rsuser

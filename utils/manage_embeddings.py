@@ -42,7 +42,7 @@ def get_embedding(model, face_pixels):
 
         return yhat[0]
 
-def save_embeddings(load_dir, model):
+def save_embeddings(load_dir, save_dir, model):
     '''
     Calls get_embbeding in order to get the embbeding for 
     each picture. Saves an array of embbedings at the 
@@ -89,5 +89,5 @@ def save_embeddings(load_dir, model):
 
     new_x_test = asarray(new_x_test)
 
-    savez_compressed(SAVE_FOLDER + 'custom_embeddings.npz', new_x_train, y_train, new_x_test, y_test)
+    savez_compressed(save_dir, new_x_train, y_train, new_x_test, y_test)
 

@@ -1,56 +1,69 @@
 from os import getcwd
 from utils.manage_dataset import load_and_save_dataset
 from utils.manage_embeddings import save_embeddings
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import LabelEncoder
+from numpy import asarray
+from numpy import sum
+import matplotlib.pyplot as plt
+from numpy import load
 from sklearn.preprocessing import Normalizer
-from sklearn.svm import SVC
-from sklearn.metrics import plot_roc_curve
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics.pairwise import cosine_similarity
+
+
 
 CURRENT_PATH = getcwd()
+SAVE_DIR = CURRENT_PATH + '/data/datasets/'
+RAW_LOCATION = SAVE_DIR + '/raw/'
+EMBEDDINGS_LOCATION = SAVE_DIR + '/embeddings/'
+MODEL_LOCATION = CURRENT_PATH + '/data/model/saved/'
 
 # Load and save the dataset in npz format
-#load_and_save_dataset('pics',1,0)
+#load_and_save_dataset('test', RAW_LOCATION + 'custom_dataset_single.npz', 1, 0)
 
 # Get and save the embeddings in npz format
-#save_embeddings(CURRENT_PATH + '/data/datasets/raw/custom_dataset.npz', CURRENT_PATH + '/data/model/saved/facenet_keras.h5')
+#save_embeddings(RAW_LOCATION + 'custom_dataset_single.npz', EMBEDDINGS_LOCATION + 'custom_embeddings_single.npz', MODEL_LOCATION + 'facenet_keras.h5')
 
 # load dataset
-data = load(CURRENT_PATH + '/data/datasets/embeddigns/custom_embeddings.npz')
+data = load(EMBEDDINGS_LOCATION + 'custom_embeddings_single.npz')
 trainX, trainy, testX, testy = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
+
+# normalize input vectors
+#in_encoder = Normalizer(norm='l2')
+#trainX = in_encoder.transform(trainX)
+#testX = in_encoder.transform(testX)
 
 print(trainX.shape)
 print(trainX[0].shape)
-print(trainX[0])
 
-# normalize input vectors
-in_encoder = Normalizer(norm='l2')
-trainX = in_encoder.transform(trainX)
-testX = in_encoder.transform(testX)
+print(testX.shape)
+print(testX[0].shape)
 
-# label encode targets
-out_encoder = LabelEncoder()
-out_encoder.fit(trainy)
-trainy = out_encoder.transform(trainy)
-testy = out_encoder.transform(testy)
+sample1 = asarray(trainX[0])
+sample2 = asarray(testX[300])
 
-# fit model
-model = SVC(kernel='linear', probability=True)
-model.fit(trainX,trainy)
+sum_tresh = sum(cosine_similarity(trainX, [sample2]))
+print(sum_tresh/7)
 
-# predict
-yhat_train = model.predict(trainX)
-yhat_test = model.predict(testX)
+wrong_pics = []
 
-# score
-score_train = accuracy_score(trainy, yhat_train)
-score_test = accuracy_score(testy, yhat_test)
+for i in range(295):
+    sample = asarray(testX[i])
+    sum_tresh = sum(cosine_similarity(trainX, [sample]))
+    sum_tresh = sum_tresh/7
+    if sum_tresh < 0.5:
+        print('Incorrect at i = ', i)
+        wrong_pics.append(i)
 
-print('Accuracy: train=%.3f, test=%.3f' % (score_train*100, score_test*100))
+for i in range(295,590):
+    sample = asarray(testX[i])
+    sum_tresh = sum(cosine_similarity(trainX, [sample]))
+    sum_tresh = sum_tresh/7
+    if sum_tresh > 0.5:
+        print('Incorrect at i = ', i)
+        wrong_pics.append(i)
 
-print(confusion_matrix(testy,yhat_test))
-print(classification_report(testy,yhat_test))
+data = load(RAW_LOCATION + 'custom_dataset_single.npz')
+trainX, trainy, testX, testy = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
 
-svc_disp = plot_roc_curve(model, testX, testy)
-plt.show()
+for item in wrong_pics:
+    plt.imshow(testX[item])
+    plt.show()

@@ -15,9 +15,6 @@ from utils.face_extract import extract_face
 from utils.set_rotation import rotate_directory
 import imageio
 
-
-SAVE_FOLDER = getcwd() + '/data/datasets/raw/'
-
 def load_faces(directory):
         ''' Use extract_faces() in order to get the faces from a specific 
               directory
@@ -99,7 +96,7 @@ def load_dataset(directory, preprocessing=0):
 
         return asarray(X), asarray(y)
 
-def load_and_save_dataset(directory, preprocess_train=0, preprocess_test=0):
+def load_and_save_dataset(load_directory, save_directory, preprocess_train=0, preprocess_test=0):
         ''' Use load_dataset() in order to load and save the dataset
               found in the directory received as arguments
             Apply preprocessing according to the value received:
@@ -108,20 +105,21 @@ def load_and_save_dataset(directory, preprocess_train=0, preprocess_test=0):
             2 - set rotation and extract faces
 
             The dataset is saved in /data/datasets/raw
+
         Args:
-            directory (string): The path to the main directory
+
+            load_directory (string): The path to the directory that contains pictures
+            save_directory (string): The path to the folder where the array is saved
+            preprocess_train (int): Described above
+            preprocess_test (int): Described above
 
         Raises: nothing
 
         Returns: nothing
 
         '''
-        print(' ============================')
-        print(SAVE_FOLDER)
-        print(' ============================')
+        x_train, y_train = load_dataset(load_directory + '/train/',preprocessing=preprocess_train)
 
-        x_train, y_train = load_dataset(directory + '/train/',preprocessing=preprocess_train)
+        x_test, y_test = load_dataset(load_directory + '/val/',preprocessing=preprocess_test)
 
-        x_test, y_test = load_dataset(directory + '/val/',preprocessing=preprocess_test)
-
-        savez_compressed(SAVE_FOLDER + 'custom_dataset.npz', x_train, y_train, x_test, y_test)
+        savez_compressed(save_directory, x_train, y_train, x_test, y_test)
