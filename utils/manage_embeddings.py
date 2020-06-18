@@ -12,6 +12,7 @@ from numpy import expand_dims
 from numpy import asarray
 from numpy import savez_compressed
 from keras.models import load_model
+from os import remove
 
 SAVE_FOLDER = getcwd() + '/data/datasets/embeddings/'
 
@@ -72,7 +73,7 @@ def save_embeddings(load_dir, save_dir, model):
     data = load(load_dir)
     x_train, y_train, x_test, y_test = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
 
-    model = load_model(model)
+    #model = load_model(model)
     model.summary()
 
     new_x_train = list()

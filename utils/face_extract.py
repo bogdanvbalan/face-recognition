@@ -11,6 +11,8 @@
 from mtcnn import MTCNN
 from PIL import Image
 from numpy import asarray
+from os import listdir
+import matplotlib.pyplot as plt
 
 def extract_face(filename, required_size=(160,160)):
     '''
@@ -63,3 +65,11 @@ def extract_face(filename, required_size=(160,160)):
         print('IndexError: ' + filename)
         return None
 
+def extract_from_directory(in_path, out):
+    for filename in listdir(in_path):
+        face_array = extract_face(in_path + filename)
+        if face_array is not None:
+            i = 0
+            for face in face_array:
+                plt.imsave(out + str(i) + filename, face)
+                i += 1
