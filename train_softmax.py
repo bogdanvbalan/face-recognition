@@ -80,7 +80,7 @@ def main(args):
         lfw_paths, actual_issame = lfw.get_paths(os.path.expanduser(args.lfw_dir), pairs)
     
     with tf.Graph().as_default():
-        tf.set_random_seed(args.seed)
+        tf.compat.v1.set_random_seed(args.seed)
         global_step = tf.Variable(0, trainable=False)
         
         # Get a list of image paths and their labels
@@ -91,18 +91,18 @@ def main(args):
 
         # Create a queue that produces indices into the image_list and label_list 
         labels = ops.convert_to_tensor(label_list, dtype=tf.int32)
-        range_size = array_ops.shape(labels)[0]
+        range_size = tf.cast(array_ops.shape(labels)[0], tf.int64)
         index_queue = tf.train.range_input_producer(range_size, num_epochs=None,
                              shuffle=True, seed=None, capacity=32)
 
         index_dequeue_op = index_queue.dequeue_many(args.batch_size * args.epoch_size, 'index_dequeue')
         
-        learning_rate_placeholder = tf.placeholder(tf.float32, name='learning_rate')
-        batch_size_placeholder = tf.placeholder(tf.int32, name='batch_size')
-        phase_train_placeholder = tf.placeholder(tf.bool, name='phase_train')
-        image_paths_placeholder = tf.placeholder(tf.string, shape=(None,1), name='image_paths')
-        labels_placeholder = tf.placeholder(tf.int32, shape=(None,1), name='labels')
-        control_placeholder = tf.placeholder(tf.int32, shape=(None,1), name='control')
+        learning_rate_placeholder = tf.compat.v1.placeholder(tf.float32, name='learning_rate')
+        batch_size_placeholder = tf.compat.v1.placeholder(tf.int32, name='batch_size')
+        phase_train_placeholder = tf.compat.v1.placeholder(tf.bool, name='phase_train')
+        image_paths_placeholder = tf.compat.v1.placeholder(tf.string, shape=(None,1), name='image_paths')
+        labels_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='labels')
+        control_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='control')
         
         nrof_preprocess_threads = 4
         input_queue = data_flow_ops.FIFOQueue(capacity=2000000,
@@ -138,13 +138,13 @@ def main(args):
         # Norm for the prelogits
         eps = 1e-4
         prelogits_norm = tf.reduce_mean(tf.norm(tf.abs(prelogits)+eps, ord=args.prelogits_norm_p, axis=1))
-        tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, prelogits_norm * args.prelogits_norm_loss_factor)
+        tf.compat.v1.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, prelogits_norm * args.prelogits_norm_loss_factor)
 
         # Add center loss
         prelogits_center_loss, _ = facenet.center_loss(prelogits, label_batch, args.center_loss_alfa, nrof_classes)
         tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES, prelogits_center_loss * args.center_loss_factor)
 
-        learning_rate = tf.train.exponential_decay(learning_rate_placeholder, global_step,
+        learning_rate = tf.compat.v1.train.exponential_decay(learning_rate_placeholder, global_step,
             args.learning_rate_decay_epochs*args.epoch_size, args.learning_rate_decay_factor, staircase=True)
         tf.summary.scalar('learning_rate', learning_rate)
 
@@ -166,17 +166,17 @@ def main(args):
             learning_rate, args.moving_average_decay, tf.global_variables(), args.log_histograms)
         
         # Create a saver
-        saver = tf.train.Saver(tf.trainable_variables(), max_to_keep=3)
+        saver = tf.compat.v1.train.Saver(tf.trainable_variables(), max_to_keep=3)
 
         # Build the summary operation based on the TF collection of Summaries.
-        summary_op = tf.summary.merge_all()
+        summary_op = tf.compat.v1.summary.merge_all()
 
         # Start running operations on the Graph.
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=p_gpu_memory_fraction)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
         sess.run(tf.global_variables_initializer())
         sess.run(tf.local_variables_initializer())
-        summary_writer = tf.summary.FileWriter(log_folder, sess.graph)
+        summary_writer = tf.compat.v1.summary.FileWriter(log_folder, sess.graph)
         coord = tf.train.Coordinator()
         tf.train.start_queue_runners(coord=coord, sess=sess)
 

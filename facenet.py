@@ -86,14 +86,14 @@ def create_input_pipeline(input_queue, image_size, nrof_preprocess_threads, batc
         filenames, label, control = input_queue.dequeue()
         images = []
         for filename in tf.unstack(filenames):
-            file_contents = tf.read_file(filename)
+            file_contents = tf.io.read_file(filename)
             image = tf.image.decode_image(file_contents, channels=3)
             image = tf.cond(get_control_flag(control[0], RANDOM_ROTATE),
                             lambda:tf.py_func(rotate_image, [image], tf.uint8), 
                             lambda:tf.identity(image))
             image = tf.cond(get_control_flag(control[0], RANDOM_CROP), 
-                            lambda:tf.random_crop(image, image_size + (3,)), 
-                            lambda:tf.image.resize_image_with_crop_or_pad(image, image_size[0], image_size[1]))
+                            lambda:tf.image.random_crop(image, image_size + (3,)), 
+                            lambda:tf.image.resize_with_crop_or_pad(image, image_size[0], image_size[1]))
             image = tf.cond(get_control_flag(control[0], RANDOM_FLIP),
                             lambda:tf.image.random_flip_left_right(image),
                             lambda:tf.identity(image))
@@ -118,7 +118,7 @@ def create_input_pipeline(input_queue, image_size, nrof_preprocess_threads, batc
     return image_batch, label_batch
 
 def get_control_flag(control, field):
-    return tf.equal(tf.mod(tf.floor_div(control, field), 2), 1)
+    return tf.equal(tf.math.mod(tf.math.floordiv(control, field), 2), 1)
   
 def _add_loss_summaries(total_loss):
     """Add summaries for losses.
@@ -153,15 +153,15 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
     # Compute gradients.
     with tf.control_dependencies([loss_averages_op]):
         if optimizer=='ADAGRAD':
-            opt = tf.train.AdagradOptimizer(learning_rate)
+            opt = tf.compat.v1.train.AdagradOptimizer(learning_rate)
         elif optimizer=='ADADELTA':
-            opt = tf.train.AdadeltaOptimizer(learning_rate, rho=0.9, epsilon=1e-6)
+            opt = tf.compat.v1.train.AdadeltaOptimizer(learning_rate, rho=0.9, epsilon=1e-6)
         elif optimizer=='ADAM':
-            opt = tf.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
+            opt = tf.compat.v1.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
         elif optimizer=='RMSPROP':
-            opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
+            opt = tf.compat.v1.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
         elif optimizer=='MOM':
-            opt = tf.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
+            opt = tf.compat.v1.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
         else:
             raise ValueError('Invalid optimization algorithm')
     
