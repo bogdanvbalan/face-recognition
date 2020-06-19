@@ -39,7 +39,8 @@ def train_softmax_inception_v2():
             '--embedding_size', emb_size,
             '--validation_set_split_ratio', val_split,
             '--validate_every_n_epochs', val_epcohs,
-            '--epoch_size', epoch_size
+            '--epoch_size', epoch_size,
+            '--batch_size', batch_size
             ]
     subprocess.call(argv, shell=True)
 

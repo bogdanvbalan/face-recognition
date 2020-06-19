@@ -20,12 +20,27 @@ from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 
+np.seterr(divide='ignore', invalid='ignore')
+
 #Params
-p_gpu_memory_fraction = 0.7  # maximum GPU memory to be used
-p_random_crop = True         # random cropping of training images (if image_size = size of traning images then no cropping is performed)
-p_random_flip = True         # random horizontal flipping of training images
-p_random_rotate = True       # random rotation of the training images
-p_fixed_img_std = True       # perform image standardization
+p_gpu_memory_fraction = 0.7          # maximum GPU memory to be used
+p_random_crop = True                 # random cropping of training images (if image_size = size of traning images then no cropping is performed)
+p_random_flip = True                 # random horizontal flipping of training images
+p_random_rotate = True               # random rotation of the training images
+p_fixed_img_std = True               # perform image standardization
+p_weight_decay = 0.0                 # l2 weight regularization
+p_center_loss = 0.0                  # center loss factor
+p_center_loss_alfa = 0.95            # center update rate for center loss
+p_prelogits_hist = 10.0              # max value for the prelogits histogram
+p_lr_decay_epochs = 100              # number of epochs between learning rate decay
+p_lr_decay_factor = 1.0              # learning rate decay factor
+p_moving_average_decay = 0.9999      # exponential decay for tracking of training params
+p_seed = 666                         # random seed
+p_nrof_preprocess_threads = 4        # preprocessing threads
+p_log_histogram = True               # loggin of weight/bias in tensorboard
+p_min_nr_img_per_class = 0           # classes with fewer images are removed
+p_pretrained_model = None            # path to pretrained model
+
 
 # Main function
 def main(args):
@@ -47,19 +62,16 @@ def main(args):
     # Write the arguments to a file inside the logs folder
     facenet.write_arguments_to_file(args, os.path.join(log_folder, 'args.txt'))
         
-    np.random.seed(seed=args.seed)
-    random.seed(args.seed)
+    np.random.seed(seed=p_seed)
+    random.seed(p_seed)
 
 
     print("Getting Dataset")
     dataset = facenet.get_dataset(args.data_dir)
     print("Got Dataset")
-    if args.filter_filename:
-        dataset = filter_dataset(dataset, os.path.expanduser(args.filter_filename), 
-            args.filter_percentile, args.filter_min_nrof_images_per_class)
         
     if args.validation_set_split_ratio>0.0:
-        train_set, val_set = facenet.split_dataset(dataset, args.validation_set_split_ratio, args.min_nrof_val_images_per_class, 'SPLIT_IMAGES')
+        train_set, val_set = facenet.split_dataset(dataset, args.validation_set_split_ratio, p_min_nr_img_per_class, 'SPLIT_IMAGES')
     else:
         train_set, val_set = dataset, []
         
@@ -68,8 +80,8 @@ def main(args):
     print('Model directory: %s' % model_folder)
     print('Log directory: %s' % log_folder)
     pretrained_model = None
-    if args.pretrained_model:
-        pretrained_model = os.path.expanduser(args.pretrained_model)
+    if p_pretrained_model:
+        pretrained_model = os.path.expanduser(p_pretrained_model)
         print('Pre-trained model: %s' % pretrained_model)
     
     if args.lfw_dir:
@@ -80,7 +92,7 @@ def main(args):
         lfw_paths, actual_issame = lfw.get_paths(os.path.expanduser(args.lfw_dir), pairs)
     
     with tf.Graph().as_default():
-        tf.compat.v1.set_random_seed(args.seed)
+        tf.compat.v1.set_random_seed(p_seed)
         global_step = tf.Variable(0, trainable=False)
         
         # Get a list of image paths and their labels
@@ -104,13 +116,12 @@ def main(args):
         labels_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='labels')
         control_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='control')
         
-        nrof_preprocess_threads = 4
         input_queue = data_flow_ops.FIFOQueue(capacity=2000000,
                                     dtypes=[tf.string, tf.int32, tf.int32],
                                     shapes=[(1,), (1,), (1,)],
                                     shared_name=None, name=None)
         enqueue_op = input_queue.enqueue_many([image_paths_placeholder, labels_placeholder, control_placeholder], name='enqueue_op')
-        image_batch, label_batch = facenet.create_input_pipeline(input_queue, image_size, nrof_preprocess_threads, batch_size_placeholder)
+        image_batch, label_batch = facenet.create_input_pipeline(input_queue, image_size, p_nrof_preprocess_threads, batch_size_placeholder)
 
         image_batch = tf.identity(image_batch, 'image_batch')
         image_batch = tf.identity(image_batch, 'input')
@@ -127,25 +138,20 @@ def main(args):
         # Build the inference graph
         prelogits, _ = network.inference(image_batch, args.keep_probability, 
             phase_train=phase_train_placeholder, bottleneck_layer_size=args.embedding_size, 
-            weight_decay=args.weight_decay)
+            weight_decay=p_weight_decay)
         logits = slim.fully_connected(prelogits, len(train_set), activation_fn=None, 
                 weights_initializer=slim.initializers.xavier_initializer(), 
-                weights_regularizer=slim.l2_regularizer(args.weight_decay),
+                weights_regularizer=slim.l2_regularizer(p_weight_decay),
                 scope='Logits', reuse=False)
 
         embeddings = tf.nn.l2_normalize(prelogits, 1, 1e-10, name='embeddings')
 
-        # Norm for the prelogits
-        eps = 1e-4
-        prelogits_norm = tf.reduce_mean(tf.norm(tf.abs(prelogits)+eps, ord=args.prelogits_norm_p, axis=1))
-        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES, prelogits_norm * args.prelogits_norm_loss_factor)
-
         # Add center loss
-        prelogits_center_loss, _ = facenet.center_loss(prelogits, label_batch, args.center_loss_alfa, nrof_classes)
-        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES, prelogits_center_loss * args.center_loss_factor)
+        prelogits_center_loss, _ = facenet.center_loss(prelogits, label_batch, p_center_loss_alfa, nrof_classes)
+        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES, prelogits_center_loss * p_center_loss)
 
         learning_rate = tf.compat.v1.train.exponential_decay(learning_rate_placeholder, global_step,
-            args.learning_rate_decay_epochs*args.epoch_size, args.learning_rate_decay_factor, staircase=True)
+            p_lr_decay_epochs * args.epoch_size, p_lr_decay_factor, staircase=True)
         tf.compat.v1.summary.scalar('learning_rate', learning_rate)
 
         # Calculate the average cross entropy loss across the batch
@@ -163,7 +169,7 @@ def main(args):
 
         # Build a Graph that trains the model with one batch of examples and updates the model parameters
         train_op = facenet.train(total_loss, global_step, args.optimizer, 
-            learning_rate, args.moving_average_decay, tf.compat.v1.global_variables(), args.log_histograms)
+            learning_rate, p_moving_average_decay, tf.compat.v1.global_variables(), p_log_histogram)
         
         # Create a saver
         saver = tf.compat.v1.train.Saver(tf.compat.v1.trainable_variables(), max_to_keep=3)
@@ -195,7 +201,6 @@ def main(args):
                 'center_loss': np.zeros((nrof_steps,), np.float32),
                 'reg_loss': np.zeros((nrof_steps,), np.float32),
                 'xent_loss': np.zeros((nrof_steps,), np.float32),
-                'prelogits_norm': np.zeros((nrof_steps,), np.float32),
                 'accuracy': np.zeros((nrof_steps,), np.float32),
                 'val_loss': np.zeros((nrof_val_samples,), np.float32),
                 'val_xent_loss': np.zeros((nrof_val_samples,), np.float32),
@@ -216,7 +221,7 @@ def main(args):
                     learning_rate_placeholder, phase_train_placeholder, batch_size_placeholder, control_placeholder, global_step, 
                     total_loss, train_op, summary_op, summary_writer, regularization_losses, args.learning_rate_schedule_file,
                     stat, cross_entropy_mean, accuracy, learning_rate,
-                    prelogits, prelogits_center_loss, p_random_rotate, p_random_crop, p_random_flip, prelogits_norm, args.prelogits_hist_max, p_fixed_img_std)
+                    prelogits, prelogits_center_loss, p_random_rotate, p_random_crop, p_random_flip, p_fixed_img_std)
                 stat['time_train'][epoch-1] = time.time() - t
                 
                 if not cont:
@@ -282,7 +287,7 @@ def train(args, sess, epoch, image_list, label_list, index_dequeue_op, enqueue_o
       learning_rate_placeholder, phase_train_placeholder, batch_size_placeholder, control_placeholder, step, 
       loss, train_op, summary_op, summary_writer, reg_losses, learning_rate_schedule_file, 
       stat, cross_entropy_mean, accuracy, 
-      learning_rate, prelogits, prelogits_center_loss, random_rotate, random_crop, random_flip, prelogits_norm, prelogits_hist_max, use_fixed_image_standardization):
+      learning_rate, prelogits, prelogits_center_loss, random_rotate, random_crop, random_flip, use_fixed_image_standardization):
     batch_number = 0
     
     if args.learning_rate>0.0:
@@ -309,22 +314,20 @@ def train(args, sess, epoch, image_list, label_list, index_dequeue_op, enqueue_o
     while batch_number < args.epoch_size:
         start_time = time.time()
         feed_dict = {learning_rate_placeholder: lr, phase_train_placeholder:True, batch_size_placeholder:args.batch_size}
-        tensor_list = [loss, train_op, step, reg_losses, prelogits, cross_entropy_mean, learning_rate, prelogits_norm, accuracy, prelogits_center_loss]
+        tensor_list = [loss, train_op, step, reg_losses, prelogits, cross_entropy_mean, learning_rate, accuracy, prelogits_center_loss]
         if batch_number % 100 == 0:
-            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, prelogits_norm_, accuracy_, center_loss_, summary_str = sess.run(tensor_list + [summary_op], feed_dict=feed_dict)
+            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, accuracy_, center_loss_, summary_str = sess.run(tensor_list + [summary_op], feed_dict=feed_dict)
             summary_writer.add_summary(summary_str, global_step=step_)
         else:
-            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, prelogits_norm_, accuracy_, center_loss_ = sess.run(tensor_list, feed_dict=feed_dict)
+            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, accuracy_, center_loss_ = sess.run(tensor_list, feed_dict=feed_dict)
          
         duration = time.time() - start_time
         stat['loss'][step_-1] = loss_
         stat['center_loss'][step_-1] = center_loss_
         stat['reg_loss'][step_-1] = np.sum(reg_losses_)
         stat['xent_loss'][step_-1] = cross_entropy_mean_
-        stat['prelogits_norm'][step_-1] = prelogits_norm_
         stat['learning_rate'][epoch-1] = lr_
         stat['accuracy'][step_-1] = accuracy_
-        stat['prelogits_hist'][epoch-1,:] += np.histogram(np.minimum(np.abs(prelogits_), prelogits_hist_max), bins=1000, range=(0.0, prelogits_hist_max))[0]
         
         duration = time.time() - start_time
         print('Epoch: [%d][%d/%d]\tTime %.3f\tLoss %2.3f\tXent %2.3f\tRegLoss %2.3f\tAccuracy %2.3f\tLr %2.5f\tCl %2.3f' %
@@ -332,7 +335,7 @@ def train(args, sess, epoch, image_list, label_list, index_dequeue_op, enqueue_o
         batch_number += 1
         train_time += duration
     # Add validation loss and accuracy to summary
-    summary = tf.Summary()
+    summary = tf.compat.v1.Summary()
     #pylint: disable=maybe-no-member
     summary.value.add(tag='time/total', simple_value=train_time)
     summary_writer.add_summary(summary, global_step=step_)
@@ -455,7 +458,7 @@ def save_variables_and_metagraph(sess, saver, summary_writer, model_folder, mode
         saver.export_meta_graph(metagraph_filename)
         save_time_metagraph = time.time() - start_time
         print('Metagraph saved in %.2f seconds' % save_time_metagraph)
-    summary = tf.Summary()
+    summary = tf.compat.v1.Summary()
     #pylint: disable=maybe-no-member
     summary.value.add(tag='time/save_variables', simple_value=save_time_variables)
     summary.value.add(tag='time/save_metagraph', simple_value=save_time_metagraph)
@@ -470,8 +473,6 @@ def parse_arguments(argv):
         help='Logs directory.', default='/logs/facenet')
     parser.add_argument('--models_dir', type=str,
         help='Location where to save the trained model and checkpoints.', default='/models/facenet')
-    parser.add_argument('--pretrained_model', type=str,
-        help='Load a pretrained model before training starts.')
     parser.add_argument('--data_dir', type=str,
         help='Directory containing the training set.')
     parser.add_argument('--model_def', type=str,
@@ -488,49 +489,18 @@ def parse_arguments(argv):
         help='Size of the embbeding vector.', default=128)
     parser.add_argument('--keep_probability', type=float,
         help='Keep probability of dropout for the fully connected layer(s).', default=1.0)
-    parser.add_argument('--weight_decay', type=float,
-        help='L2 weight regularization.', default=0.0)
-    parser.add_argument('--center_loss_factor', type=float,
-        help='Center loss factor.', default=0.0)
-    parser.add_argument('--center_loss_alfa', type=float,
-        help='Center update rate for center loss.', default=0.95)
-    parser.add_argument('--prelogits_norm_loss_factor', type=float,
-        help='Loss based on the norm of the activations in the prelogits layer.', default=0.0)
-    parser.add_argument('--prelogits_norm_p', type=float,
-        help='Norm to use for prelogits norm loss.', default=1.0)
-    parser.add_argument('--prelogits_hist_max', type=float,
-        help='The max value for the prelogits histogram.', default=10.0)
     parser.add_argument('--optimizer', type=str, choices=['ADAGRAD', 'ADADELTA', 'ADAM', 'RMSPROP', 'MOM'],
         help='The optimization algorithm to use', default='ADAGRAD')
     parser.add_argument('--learning_rate', type=float,
         help='Initial learning rate. If set to a negative value a learning rate ' +
         'schedule can be specified in the file "learning_rate_schedule.txt"', default=0.1)
-    parser.add_argument('--learning_rate_decay_epochs', type=int,
-        help='Number of epochs between learning rate decay.', default=100)
-    parser.add_argument('--learning_rate_decay_factor', type=float,
-        help='Learning rate decay factor.', default=1.0)
-    parser.add_argument('--moving_average_decay', type=float,
-        help='Exponential decay for tracking of training parameters.', default=0.9999)
-    parser.add_argument('--seed', type=int,
-        help='Random seed.', default=666)
-    parser.add_argument('--nrof_preprocess_threads', type=int,
-        help='Number of preprocessing (data loading and augmentation) threads.', default=4)
-    parser.add_argument('--log_histograms', 
-        help='Enables logging of weight/bias histograms in tensorboard.', action='store_true')
     parser.add_argument('--learning_rate_schedule_file', type=str,
         help='File containing the learning rate schedule that is used when learning_rate is set to to -1.', default='data/learning_rate_schedule.txt')
-    parser.add_argument('--filter_filename', type=str,
-        help='File containing image data used for dataset filtering', default='')
-    parser.add_argument('--filter_percentile', type=float,
-        help='Keep only the percentile images closed to its class center', default=100.0)
-    parser.add_argument('--filter_min_nrof_images_per_class', type=int,
-        help='Keep only the classes with this number of examples or more', default=0)
     parser.add_argument('--validate_every_n_epochs', type=int,
         help='Number of epoch between validation', default=5)
     parser.add_argument('--validation_set_split_ratio', type=float,
         help='The ratio of the total dataset to use for validation', default=0.0)
-    parser.add_argument('--min_nrof_val_images_per_class', type=float,
-        help='Classes with fewer images will be removed from the validation set', default=0)
+
  
     # Parameters for validation on LFW
     parser.add_argument('--lfw_pairs', type=str,
