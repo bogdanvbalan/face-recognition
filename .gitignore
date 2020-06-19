@@ -18,6 +18,8 @@ test/
 *.pyproj
 *.npz
 *.h5
+*.jpeg
+*.jpg
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -357,3 +359,7 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+/models/facenet
+/extracted.rar
+/abc.pb
+/report.txt
