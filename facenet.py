@@ -8,7 +8,7 @@ import tensorflow as tf
 import numpy as np
 from scipy import misc
 from sklearn.model_selection import KFold
-from skimage.transform import rotate
+from scipy import ndimage
 from scipy import interpolate
 from tensorflow.python.training import training
 import random
@@ -16,7 +16,7 @@ import re
 from tensorflow.python.platform import gfile
 import math
 from six import iteritems
-
+import matplotlib.pyplot as plt
 
 def triplet_loss(anchor, positive, negative, alpha):
     """Calculate the triplet loss according to the FaceNet paper
@@ -70,7 +70,8 @@ def shuffle_examples(image_paths, labels):
 # Rotate the image using a random angle in the interval [-10, +10] degrees
 def rotate_image(image):
     angle = np.random.uniform(low=-10.0, high=10.0)
-    return rotate(image, angle)
+    image_rotated = ndimage.rotate(image, angle, reshape=False)
+    return image_rotated
   
 # 1: Random rotate 2: Random crop  4: Random flip  8:  Fixed image standardization  16: Flip
 RANDOM_ROTATE = 1
