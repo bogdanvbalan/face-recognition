@@ -12,15 +12,12 @@ import numpy as np
 import importlib
 import argparse
 import facenet
-import lfw
 import h5py
 import math
 import tensorflow.contrib.slim as slim
 from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
-
-np.seterr(divide='ignore', invalid='ignore')
 
 #Params
 p_gpu_memory_fraction = 0.7          # maximum GPU memory to be used
@@ -83,13 +80,6 @@ def main(args):
     if p_pretrained_model:
         pretrained_model = os.path.expanduser(p_pretrained_model)
         print('Pre-trained model: %s' % pretrained_model)
-    
-    if args.lfw_dir:
-        print('LFW directory: %s' % args.lfw_dir)
-        # Read the file containing the pairs used for testing
-        pairs = lfw.read_pairs(os.path.expanduser(args.lfw_pairs))
-        # Get the paths for the corresponding images
-        lfw_paths, actual_issame = lfw.get_paths(os.path.expanduser(args.lfw_dir), pairs)
     
     with tf.Graph().as_default():
         tf.compat.v1.set_random_seed(p_seed)
@@ -237,14 +227,6 @@ def main(args):
                 # Save variables and the metagraph if it doesn't exist already
                 save_variables_and_metagraph(sess, saver, summary_writer, model_folder, subfolder, epoch)
 
-                # Evaluate on LFW
-                t = time.time()
-                if args.lfw_dir:
-                    evaluate(sess, enqueue_op, image_paths_placeholder, labels_placeholder, phase_train_placeholder, batch_size_placeholder, control_placeholder, 
-                        embeddings, label_batch, lfw_paths, actual_issame, args.lfw_batch_size, args.lfw_nrof_folds, log_folder, step, summary_writer, stat, epoch, 
-                        args.lfw_distance_metric, args.lfw_subtract_mean, args.lfw_use_flipped_images, p_fixed_img_std)
-                stat['time_evaluate'][epoch-1] = time.time() - t
-
                 print('Saving statistics')
                 with h5py.File(stat_file_name, 'w') as f:
                     for key, value in stat.items():
@@ -347,8 +329,8 @@ def validate(args, sess, epoch, image_list, label_list, enqueue_op, image_paths_
   
     print('Running forward pass on validation set')
 
-    nrof_batches = len(label_list) // args.lfw_batch_size
-    nrof_images = nrof_batches * args.lfw_batch_size
+    nrof_batches = len(label_list) // args.batch_size
+    nrof_images = nrof_batches * args.batch_size
     
     # Enqueue one epoch of image paths and labels
     labels_array = np.expand_dims(np.array(label_list[:nrof_images]),1)
@@ -363,7 +345,7 @@ def validate(args, sess, epoch, image_list, label_list, enqueue_op, image_paths_
     # Training loop
     start_time = time.time()
     for i in range(nrof_batches):
-        feed_dict = {phase_train_placeholder:False, batch_size_placeholder:args.lfw_batch_size}
+        feed_dict = {phase_train_placeholder:False, batch_size_placeholder:args.batch_size}
         loss_, cross_entropy_mean_, accuracy_ = sess.run([loss, cross_entropy_mean, accuracy], feed_dict=feed_dict)
         loss_array[i], xent_array[i], accuracy_array[i] = (loss_, cross_entropy_mean_, accuracy_)
         if i % 10 == 9:
@@ -501,22 +483,6 @@ def parse_arguments(argv):
     parser.add_argument('--validation_set_split_ratio', type=float,
         help='The ratio of the total dataset to use for validation', default=0.0)
 
- 
-    # Parameters for validation on LFW
-    parser.add_argument('--lfw_pairs', type=str,
-        help='The file containing the pairs to use for validation.', default='data/pairs.txt')
-    parser.add_argument('--lfw_dir', type=str,
-        help='Path to the data directory containing aligned face patches.', default='')
-    parser.add_argument('--lfw_batch_size', type=int,
-        help='Number of images to process in a batch in the LFW test set.', default=100)
-    parser.add_argument('--lfw_nrof_folds', type=int,
-        help='Number of folds to use for cross validation. Mainly used for testing.', default=10)
-    parser.add_argument('--lfw_distance_metric', type=int,
-        help='Type of distance metric to use. 0: Euclidian, 1:Cosine similarity distance.', default=0)
-    parser.add_argument('--lfw_use_flipped_images', 
-        help='Concatenates embeddings for the image and its horizontally flipped counterpart.', action='store_true')
-    parser.add_argument('--lfw_subtract_mean', 
-        help='Subtract feature mean before calculating distance.', action='store_true')
     return parser.parse_args(argv)
   
 

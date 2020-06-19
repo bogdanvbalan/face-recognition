@@ -179,7 +179,7 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
     if log_histograms:
         for grad, var in grads:
             if grad is not None:
-                tf.summary.histogram(var.op.name + '/gradients', grad)
+                tf.compat.v1.summary.histogram(var.op.name + '/gradients', grad)
   
     # Track the moving averages of all trainable variables.
     variable_averages = tf.train.ExponentialMovingAverage(
