@@ -23,9 +23,9 @@ from tensorflow.python.ops import array_ops
 p_gpu_memory_fraction = 0.7          # maximum GPU memory to be used
 p_random_crop = True                 # random cropping of training images (if image_size = size of traning images then no cropping is performed)
 p_random_flip = True                 # random horizontal flipping of training images
-p_random_rotate = True               # random rotation of the training images
+p_random_rotate = False              # random rotation of the training images
 p_fixed_img_std = True               # perform image standardization
-p_weight_decay = 0.0                 # l2 weight regularization
+p_weight_decay = 5e-4                # l2 weight regularization
 p_center_loss = 0.0                  # center loss factor
 p_center_loss_alfa = 0.95            # center update rate for center loss
 p_prelogits_hist = 10.0              # max value for the prelogits histogram
@@ -37,7 +37,8 @@ p_nrof_preprocess_threads = 4        # preprocessing threads
 p_log_histogram = True               # loggin of weight/bias in tensorboard
 p_min_nr_img_per_class = 0           # classes with fewer images are removed
 p_pretrained_model = None            # path to pretrained model
-
+p_prelogits_norm_loss_factor = 5e-4  # loss based on the norm of the activation in prelogits layer
+p_prelogits_norm_p = 1.0             # norm to use for prelogits norm loss
 
 # Main function
 def main(args):
@@ -136,6 +137,11 @@ def main(args):
 
         embeddings = tf.nn.l2_normalize(prelogits, 1, 1e-10, name='embeddings')
 
+         # Norm for the prelogits
+        eps = 1e-4
+        prelogits_norm = tf.reduce_mean(tf.norm(tf.abs(prelogits)+eps, ord=p_prelogits_norm_p, axis=1))
+        tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES, prelogits_norm * p_prelogits_norm_loss_factor)
+
         # Add center loss
         prelogits_center_loss, _ = facenet.center_loss(prelogits, label_batch, p_center_loss_alfa, nrof_classes)
         tf.compat.v1.add_to_collection(tf.compat.v1.GraphKeys.REGULARIZATION_LOSSES, prelogits_center_loss * p_center_loss)
@@ -191,6 +197,7 @@ def main(args):
                 'center_loss': np.zeros((nrof_steps,), np.float32),
                 'reg_loss': np.zeros((nrof_steps,), np.float32),
                 'xent_loss': np.zeros((nrof_steps,), np.float32),
+                'prelogits_norm': np.zeros((nrof_steps,), np.float32),
                 'accuracy': np.zeros((nrof_steps,), np.float32),
                 'val_loss': np.zeros((nrof_val_samples,), np.float32),
                 'val_xent_loss': np.zeros((nrof_val_samples,), np.float32),
@@ -211,7 +218,7 @@ def main(args):
                     learning_rate_placeholder, phase_train_placeholder, batch_size_placeholder, control_placeholder, global_step, 
                     total_loss, train_op, summary_op, summary_writer, regularization_losses, args.learning_rate_schedule_file,
                     stat, cross_entropy_mean, accuracy, learning_rate,
-                    prelogits, prelogits_center_loss, p_random_rotate, p_random_crop, p_random_flip, p_fixed_img_std)
+                    prelogits, prelogits_center_loss, p_random_rotate, p_random_crop, p_random_flip, prelogits_norm, p_prelogits_hist, p_fixed_img_std)
                 stat['time_train'][epoch-1] = time.time() - t
                 
                 if not cont:
@@ -269,7 +276,7 @@ def train(args, sess, epoch, image_list, label_list, index_dequeue_op, enqueue_o
       learning_rate_placeholder, phase_train_placeholder, batch_size_placeholder, control_placeholder, step, 
       loss, train_op, summary_op, summary_writer, reg_losses, learning_rate_schedule_file, 
       stat, cross_entropy_mean, accuracy, 
-      learning_rate, prelogits, prelogits_center_loss, random_rotate, random_crop, random_flip, use_fixed_image_standardization):
+      learning_rate, prelogits, prelogits_center_loss, random_rotate, random_crop, random_flip, prelogits_norm, prelogits_hist_max, use_fixed_image_standardization):
     batch_number = 0
     
     if args.learning_rate>0.0:
@@ -296,21 +303,23 @@ def train(args, sess, epoch, image_list, label_list, index_dequeue_op, enqueue_o
     while batch_number < args.epoch_size:
         start_time = time.time()
         feed_dict = {learning_rate_placeholder: lr, phase_train_placeholder:True, batch_size_placeholder:args.batch_size}
-        tensor_list = [loss, train_op, step, reg_losses, prelogits, cross_entropy_mean, learning_rate, accuracy, prelogits_center_loss]
+        tensor_list = [loss, train_op, step, reg_losses, prelogits, cross_entropy_mean, learning_rate, prelogits_norm, accuracy, prelogits_center_loss]
         if batch_number % 100 == 0:
-            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, accuracy_, center_loss_, summary_str = sess.run(tensor_list + [summary_op], feed_dict=feed_dict)
+            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, prelogits_norm_, accuracy_, center_loss_, summary_str = sess.run(tensor_list + [summary_op], feed_dict=feed_dict)
             summary_writer.add_summary(summary_str, global_step=step_)
         else:
-            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, accuracy_, center_loss_ = sess.run(tensor_list, feed_dict=feed_dict)
+            loss_, _, step_, reg_losses_, prelogits_, cross_entropy_mean_, lr_, prelogits_norm_, accuracy_, center_loss_ = sess.run(tensor_list, feed_dict=feed_dict)
          
         duration = time.time() - start_time
         stat['loss'][step_-1] = loss_
         stat['center_loss'][step_-1] = center_loss_
         stat['reg_loss'][step_-1] = np.sum(reg_losses_)
         stat['xent_loss'][step_-1] = cross_entropy_mean_
+        stat['prelogits_norm'][step_-1] = prelogits_norm_
         stat['learning_rate'][epoch-1] = lr_
         stat['accuracy'][step_-1] = accuracy_
-        
+        stat['prelogits_hist'][epoch-1,:] += np.histogram(np.minimum(np.abs(prelogits_), prelogits_hist_max), bins=1000, range=(0.0, prelogits_hist_max))[0]
+
         duration = time.time() - start_time
         print('Epoch: [%d][%d/%d]\tTime %.3f\tLoss %2.3f\tXent %2.3f\tRegLoss %2.3f\tAccuracy %2.3f\tLr %2.5f\tCl %2.3f' %
               (epoch, batch_number+1, args.epoch_size, duration, loss_, cross_entropy_mean_, np.sum(reg_losses_), accuracy_, lr_, center_loss_))
@@ -368,8 +377,7 @@ def evaluate(sess, enqueue_op, image_paths_placeholder, labels_placeholder, phas
         embeddings, labels, image_paths, actual_issame, batch_size, nrof_folds, log_folder, step, summary_writer, stat, epoch, distance_metric, subtract_mean, use_flipped_images, use_fixed_image_standardization):
     start_time = time.time()
     # Run forward pass to calculate embeddings
-    print('Runnning forward pass on LFW images')
-    
+   
     # Enqueue one epoch of image paths and labels
     nrof_embeddings = len(actual_issame)*2  # nrof_pairs * nrof_images_per_pair
     nrof_flips = 2 if use_flipped_images else 1
