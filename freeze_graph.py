@@ -10,17 +10,22 @@ import sys
 import facenet
 from six.moves import xrange  # @UnresolvedImport
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+
+p_dir = r"D:\Projects\Face_Recognition\Face_Recognition\Face-Recognition\models\facenet\20200810-202310"
+p_out = r"train_10000es_8epcs.pb"
+
 def main(args):
     with tf.Graph().as_default():
         with tf.Session() as sess:
             # Load the model metagraph and checkpoint
-            print('Model directory: %s' % args.model_dir)
-            meta_file, ckpt_file = facenet.get_model_filenames(os.path.expanduser(args.model_dir))
+            print('Model directory: %s' % p_dir)
+            meta_file, ckpt_file = facenet.get_model_filenames(os.path.expanduser(p_dir))
             
             print('Metagraph file: %s' % meta_file)
             print('Checkpoint file: %s' % ckpt_file)
 
-            model_dir_exp = os.path.expanduser(args.model_dir)
+            model_dir_exp = os.path.expanduser(p_dir)
             saver = tf.train.import_meta_graph(os.path.join(model_dir_exp, meta_file), clear_devices=True)
             tf.get_default_session().run(tf.global_variables_initializer())
             tf.get_default_session().run(tf.local_variables_initializer())
@@ -33,9 +38,9 @@ def main(args):
             output_graph_def = freeze_graph_def(sess, input_graph_def, 'embeddings,label_batch')
 
         # Serialize and dump the output graph to the filesystem
-        with tf.gfile.GFile(args.output_file, 'wb') as f:
+        with tf.gfile.GFile(p_out, 'wb') as f:
             f.write(output_graph_def.SerializeToString())
-        print("%d ops in the final graph: %s" % (len(output_graph_def.node), args.output_file))
+        print("%d ops in the final graph: %s" % (len(output_graph_def.node), p_out))
         
 def freeze_graph_def(sess, input_graph_def, output_node_names):
     for node in input_graph_def.node:

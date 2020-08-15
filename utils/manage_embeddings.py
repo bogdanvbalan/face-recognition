@@ -13,21 +13,28 @@ from numpy import asarray
 from numpy import savez_compressed
 from keras.models import load_model
 from os import remove
+import facenet
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from os import listdir
 
 SAVE_FOLDER = getcwd() + '/data/datasets/embeddings/'
 
-def get_embedding(model, face_pixels):
+def get_embedding(model, img):
         ''' Get the face embedding for one face
 
         Args:
-            model: A nn model that is loaded via load_model
-            face_pixels: An array containing the face
+            model: The path to the pb file
+            img: The path to the image file
 
         Raises: nothing
 
         Returns: yhat: the prediction of the model un the current face
 
         '''
+        # load 
+        face_pixels = plt.imread(img)
+
         # scale pixel values
         face_pixels = face_pixels.astype('float32')
         
@@ -38,10 +45,66 @@ def get_embedding(model, face_pixels):
         # transform into one sample
         samples = expand_dims(face_pixels, axis=0)
 
-        # make prediction
-        yhat = model.predict(samples)
+        # get embeddings
+        with tf.Graph().as_default():
+            with tf.Session() as sees:
 
-        return yhat[0]
+                # load model
+                facenet.load_model(model)
+
+                # input and output tensors
+                images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
+                embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
+                phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
+
+                # fw pass to calculate embeddings
+                feed_dict = { images_placeholder: samples, phase_train_placeholder: False}
+                emb = sees.run(embeddings, feed_dict=feed_dict)
+
+        return emb
+
+def get_embedding_ex(model, img):
+    ''' Get the face embedding for one face
+
+    Args:
+        model: The path to the pb file
+        img: The path to the image file
+
+    Raises: nothing
+
+    Returns: yhat: the prediction of the model un the current face
+
+    '''
+    # load 
+    #face_pixels = plt.imread(img)
+
+    # scale pixel values
+    face_pixels = img.astype('float32')
+        
+    # standardize pixel values
+    mean, std = face_pixels.mean(), face_pixels.std()
+    face_pixels = (face_pixels - mean) / std
+
+    # transform into one sample
+    samples = expand_dims(face_pixels, axis=0)
+
+    # get embeddings
+    with tf.Graph().as_default():
+        with tf.Session() as sees:
+
+            # load model
+            facenet.load_model(model)
+
+            # input and output tensors
+            images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
+            embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
+            phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
+
+            # fw pass to calculate embeddings
+            feed_dict = { images_placeholder: samples, phase_train_placeholder: False}
+            emb = sees.run(embeddings, feed_dict=feed_dict)
+
+    return emb
 
 def save_embeddings(load_dir, save_dir, model):
     '''
@@ -49,12 +112,9 @@ def save_embeddings(load_dir, save_dir, model):
     each picture. Saves an array of embbedings at the 
     path received.
 
-    It is assumed that the data file contains is split in 4 
-    sets (X and y for both train and test)
     Args:
 
-        load_dir (str): the path to the npz file that contains the 
-                        pictures
+        load_dir (str): the path to the directory where the registration images are stored
         save_dir (str): the path to the npz file location where the 
                          embbedings will be saved
         model (str): the path to the model that will be used 
@@ -68,27 +128,16 @@ def save_embeddings(load_dir, save_dir, model):
 
         nothing
     '''
-    print('save_embeddings() - Load dir', load_dir)
+    print("Gettings embeddings for files in " + str(load_dir) + " and saving them to: " + str(save_dir))
 
-    data = load(load_dir)
-    x_train, y_train, x_test, y_test = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
+    # get the embedding for each image
+    embeddings = list()
+    for filename in listdir(load_dir):
+        embedding = get_embedding(model, load_dir + "\\" + filename)
+        embeddings.append(embedding[0])
 
-    #model = load_model(model)
-    model.summary()
+    embeddings = asarray(embeddings)
 
-    new_x_train = list()
-    for face_pixels in x_train:
-        embedding = get_embedding(model, face_pixels)
-        new_x_train.append(embedding)
-    
-    new_x_train = asarray(new_x_train)
-
-    new_x_test = list()
-    for face_pixels in x_test:
-        embedding = get_embedding(model, face_pixels)
-        new_x_test.append(embedding)
-
-    new_x_test = asarray(new_x_test)
-
-    savez_compressed(save_dir, new_x_train, y_train, new_x_test, y_test)
+    # save the embeddings 
+    savez_compressed(save_dir, embeddings)
 

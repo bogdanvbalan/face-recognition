@@ -18,6 +18,8 @@ import math
 from six import iteritems
 import matplotlib.pyplot as plt
 
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+
 def triplet_loss(anchor, positive, negative, alpha):
     """Calculate the triplet loss according to the FaceNet paper
     
@@ -268,16 +270,30 @@ def get_triplet_batch(triplets, batch_index, batch_size):
     return batch
 
 def get_learning_rate_from_file(filename, epoch):
-    with open(filename, 'r') as f:
-        for line in f.readlines():
-            line = line.split('#', 1)[0]
-            if line:
-                par = line.strip().split(':')
-                e = int(float(par[0]))
-                if par[1]=='-':
+    ''' Reads the learning rate from the provided file
+
+    Args:
+        filename (string): The path to the file that contains learning rates
+        epoch (int): current epoch number
+
+    Raises: nothing
+
+    Returns: the learning rate value corresponding to the current epoch
+
+    '''
+    # open the file
+    with open(filename, 'r') as current_file:
+        # read each line
+        for linie in current_file.readlines():
+            # get the epoch and lr values
+            linie = linie.split('#', 1)[0]
+            if linie:
+                lns = linie.strip().split(':')
+                e = int(float(lns[0]))
+                if lns[1]=='-':
                     lr = -1
                 else:
-                    lr = float(par[1])
+                    lr = float(lns[1])
                 if e <= epoch:
                     learning_rate = lr
                 else:

@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # Face extraction
-# 
-# We use the MTCNN network in order to extract faces from pictures.
-# 
-# We will get all the faces that are found in a picture and return them.
-
 from PIL import Image
 from PIL import ImageFile
 import piexif
@@ -29,7 +20,7 @@ def rotate_jpeg(filename, save_name, output_dir=None):
         exif_dict = piexif.load(img.info["exif"])
 
         if piexif.ImageIFD.Orientation in exif_dict["0th"]:
-            print('Got to rotate_jpeg with ' + filename + ' and ' + output_dir)
+            print('Got to rotate_jpeg with ' + str(filename) + ' and ' + str(output_dir))
             orientation = exif_dict["0th"].pop(piexif.ImageIFD.Orientation)
             exif_bytes = piexif.dump(exif_dict)
 

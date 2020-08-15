@@ -18,13 +18,14 @@ import tensorflow.contrib.slim as slim
 from tensorflow.python.ops import data_flow_ops
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
+import warnings
 
 #Params
-p_gpu_memory_fraction = 0.7          # maximum GPU memory to be used
-p_random_crop = True                 # random cropping of training images (if image_size = size of traning images then no cropping is performed)
-p_random_flip = True                 # random horizontal flipping of training images
+p_gpu_memory_fraction = 0.75          # maximum GPU memory to be used
+p_random_crop = False                 # random cropping of training images (if image_size = size of traning images then no cropping is performed)
+p_random_flip = False                 # random horizontal flipping of training images
 p_random_rotate = False              # random rotation of the training images
-p_fixed_img_std = True               # perform image standardization
+p_fixed_img_std = False               # perform image standardization
 p_weight_decay = 5e-4                # l2 weight regularization
 p_center_loss = 0.0                  # center loss factor
 p_center_loss_alfa = 0.95            # center update rate for center loss
@@ -35,10 +36,12 @@ p_moving_average_decay = 0.9999      # exponential decay for tracking of trainin
 p_seed = 666                         # random seed
 p_nrof_preprocess_threads = 4        # preprocessing threads
 p_log_histogram = True               # loggin of weight/bias in tensorboard
-p_min_nr_img_per_class = 0           # classes with fewer images are removed
+p_min_nr_img_per_class = 30           # classes with fewer images are removed
 p_pretrained_model = None            # path to pretrained model
 p_prelogits_norm_loss_factor = 5e-4  # loss based on the norm of the activation in prelogits layer
 p_prelogits_norm_p = 1.0             # norm to use for prelogits norm loss
+
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
 # Main function
 def main(args):
@@ -107,7 +110,7 @@ def main(args):
         labels_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='labels')
         control_placeholder = tf.compat.v1.placeholder(tf.int32, shape=(None,1), name='control')
         
-        input_queue = data_flow_ops.FIFOQueue(capacity=2000000,
+        input_queue = data_flow_ops.FIFOQueue(capacity=10000000,
                                     dtypes=[tf.string, tf.int32, tf.int32],
                                     shapes=[(1,), (1,), (1,)],
                                     shared_name=None, name=None)
@@ -490,6 +493,8 @@ def parse_arguments(argv):
         help='Number of epoch between validation', default=5)
     parser.add_argument('--validation_set_split_ratio', type=float,
         help='The ratio of the total dataset to use for validation', default=0.0)
+
+
 
     return parser.parse_args(argv)
   

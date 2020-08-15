@@ -20,17 +20,16 @@ EMBEDDINGS_LOCATION = SAVE_DIR + '/embeddings/'
 MODEL_LOCATION = CURRENT_PATH + '/data/model/saved/'
 TEST_DIM = 4542
 
-model = facenet.load_model('abc.pb')
-model.summary()
+
 # Load and save the dataset in npz format
 #load_and_save_dataset('test', RAW_LOCATION + 'custom_dataset_single.npz', 1, 0)
 
 # Get and save the embeddings in npz format
-save_embeddings(RAW_LOCATION + 'custom_dataset_single.npz', EMBEDDINGS_LOCATION + 'custom_embeddings_single.npz', model)
+#save_embeddings(RAW_LOCATION + 'custom_dataset_single.npz', EMBEDDINGS_LOCATION + 'custom_embeddings_single.npz', model)
 
 # load dataset
-data = load(EMBEDDINGS_LOCATION + 'custom_embeddings_single.npz')
-trainX, trainy, testX, testy = data['arr_0'], data['arr_1'], data['arr_2'], data['arr_3']
+data = load('train_10000es_8epcs.npz')
+trainX = data['arr_0']
 
 # normalize input vectors
 #in_encoder = Normalizer(norm='l2')
@@ -74,7 +73,7 @@ trainX, trainy, testX, testy = data['arr_0'], data['arr_1'], data['arr_2'], data
 #    plt.imshow(testX[item])
 #    plt.show()
 
-model = load_model('abc.pb')
+model = 'train_10000es_8epcs.pb'
 
 #for filename in listdir('extracted'):
 #    current_im = plt.imread('extracted/' + filename)
@@ -92,22 +91,24 @@ false_pos = 0
 false_neg = 0
 
 for filename in listdir('custom_pics/bogdan'):
-    current_im = plt.imread('custom_pics/bogdan/' + filename)
-    embedding = get_embedding(model, current_im)
+    #current_im = plt.imread('custom_pics/bogdan/' + filename)
+    embedding = get_embedding(model, 'custom_pics/bogdan/' + filename)
     embedding = asarray(embedding)
-    sum_tresh = sum(cosine_similarity(trainX, [embedding]))
-    sum_tresh = sum_tresh/7
+    sum_tresh = sum(cosine_similarity(trainX, embedding))
+    sum_tresh = sum_tresh/len(trainX)
+    print(sum_tresh)
     if sum_tresh > 0.5:
         true_pos +=1
     else:
         false_pos +=1
 
 for filename in listdir('custom_pics/other'):
-    current_im = plt.imread('custom_pics/other/' + filename)
-    embedding = get_embedding(model, current_im)
+    #current_im = plt.imread('custom_pics/other/' + filename)
+    embedding = get_embedding(model, 'custom_pics/other/' + filename)
     embedding = asarray(embedding)
-    sum_tresh = sum(cosine_similarity(trainX, [embedding]))
-    sum_tresh = sum_tresh/7
+    sum_tresh = sum(cosine_similarity(trainX, embedding))
+    sum_tresh = sum_tresh/len(trainX)
+    print(sum_tresh)
     if sum_tresh > 0.5:
         false_neg +=1
     else:
